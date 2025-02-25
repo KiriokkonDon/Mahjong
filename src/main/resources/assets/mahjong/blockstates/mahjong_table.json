@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "mahjong:block/mahjong_table" }
+  }
+}

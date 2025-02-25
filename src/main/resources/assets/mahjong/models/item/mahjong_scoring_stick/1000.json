@@ -1,0 +1,6 @@
+{
+	"parent": "mahjong:item/mahjong_scoring_stick_base",
+	"textures": {
+		"1": "mahjong:item/mahjong_scoring_stick/1000"
+	}
+}

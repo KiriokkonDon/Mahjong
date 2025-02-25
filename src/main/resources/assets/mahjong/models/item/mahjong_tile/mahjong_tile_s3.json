@@ -1,0 +1,6 @@
+{
+	"parent": "mahjong:item/mahjong_tile_base",
+	"textures": {
+		"0": "mahjong:item/mahjong_tile/mahjong_tile_s3"
+	}
+}
