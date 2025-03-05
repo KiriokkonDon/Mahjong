@@ -150,23 +150,42 @@ class MahjongPlayer(
         canAnkanTiles: Set<MahjongTile>,
         canKakanTiles: Set<Pair<MahjongTile, ClaimTarget>>,
         rule: MahjongRule,
-    ): MahjongTile? = waitForBehaviorResult(
-        behavior = MahjongGameBehavior.ANKAN_OR_KAKAN,
-        extraData = Json.encodeToString(
-            listOf(
-                Json.encodeToString(canAnkanTiles),
-                Json.encodeToString(canKakanTiles),
-                rule.toJsonString()
-            )
-        ),
-        target = ClaimTarget.SELF
-    ) { behavior, data ->
-        val result = runCatching {
-            Json.decodeFromString<MahjongTile>(data)
-        }.getOrNull() ?: return@waitForBehaviorResult null
-        if (behavior == MahjongGameBehavior.ANKAN_OR_KAKAN) {
-            if (result in canAnkanTiles || result in canKakanTiles.unzip().first) result else null
-        } else null
+    ): MahjongTile? {
+        // Фильтруем только тайлы из руки игрока
+        val validAnkanTiles = canAnkanTiles.filter { tile -> hands.any { it.mahjongTile == tile } }.toSet()
+        val validKakanTiles = canKakanTiles.filter { (tile, _) -> hands.any { it.mahjongTile == tile } }.toSet()
+
+        if (validAnkanTiles.isEmpty() && validKakanTiles.isEmpty()) {
+            return null
+        }
+
+        return waitForBehaviorResult(
+            behavior = MahjongGameBehavior.ANKAN_OR_KAKAN,
+            extraData = Json.encodeToString(
+                listOf(
+                    Json.encodeToString(validAnkanTiles),
+                    Json.encodeToString(validKakanTiles),
+                    rule.toJsonString()
+                )
+            ),
+            target = ClaimTarget.SELF
+        ) { behavior, data ->
+            val result = runCatching {
+                Json.decodeFromString<MahjongTile>(data)
+            }.getOrNull() ?: return@waitForBehaviorResult null
+            if (behavior == MahjongGameBehavior.ANKAN_OR_KAKAN) {
+                if (result in validAnkanTiles || result in validKakanTiles.unzip().first) {
+                    // Дополнительная проверка на сервере
+                    if (hands.any { it.mahjongTile == result }) {
+                        result
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            } else null
+        }
     }
 
 

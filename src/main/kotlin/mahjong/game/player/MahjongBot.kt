@@ -1,10 +1,14 @@
 package mahjong.game.player
 
 import mahjong.entity.BotEntity
+import mahjong.game.game_logic.ClaimTarget
+import mahjong.game.game_logic.MahjongRule
 import mahjong.game.game_logic.MahjongTile
+import net.minecraft.network.packet.s2c.play.PositionFlag
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import java.util.*
 
 class MahjongBot(
     val world: ServerWorld,
@@ -33,11 +37,31 @@ class MahjongBot(
 
     override fun teleport(targetWorld: ServerWorld, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) {
         with(entity) {
-            if (this.world != targetWorld) moveToWorld(targetWorld)
+            this.teleport(targetWorld, x, y, z, EnumSet.noneOf(PositionFlag::class.java), yaw, pitch)
             this.yaw = yaw
             this.pitch = pitch
-            requestTeleport(x, y, z)
             faceTable(tableCenterPos)
         }
+    }
+
+    override suspend fun askToAnkanOrKakan(
+        canAnkanTiles: Set<MahjongTile>,
+        canKakanTiles: Set<Pair<MahjongTile, ClaimTarget>>,
+        rule: MahjongRule,
+    ): MahjongTile? {
+        val validAnkanTiles = canAnkanTiles.filter { tile -> hands.any { it.mahjongTile == tile } }.toSet()
+        val validKakanTiles = canKakanTiles.filter { (tile, _) -> hands.any { it.mahjongTile == tile } }.toSet()
+
+        val ankanChoice = validAnkanTiles.firstOrNull()
+        if (ankanChoice != null) {
+            return ankanChoice
+        }
+
+        val kakanChoice = validKakanTiles.firstOrNull()?.first
+        if (kakanChoice != null) {
+            return kakanChoice
+        }
+
+        return null
     }
 }

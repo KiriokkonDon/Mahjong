@@ -444,7 +444,7 @@ class MahjongTableGui(
                             face.y,
                             face.width,
                             face.height,
-                            Identifier("minecraft:textures/item/structure_void.png")
+                            Identifier.of("minecraft:textures/item/structure_void.png")
                         )
                     }
                 }
@@ -479,7 +479,7 @@ class MahjongTableGui(
             ): WWidget = when {
                 isBot -> botFace(x, y, width, height)
                 uuid != null && name != null -> playerFace(x, y, width, height, uuid, name)
-                else -> image(x, y, width, height, Identifier("minecraft:textures/item/structure_void.png"))
+                else -> image(x, y, width, height, Identifier.of("minecraft:textures/item/structure_void.png"))
             }
         }
     }

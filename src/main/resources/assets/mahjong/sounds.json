@@ -1,0 +1,56 @@
+{
+  "chii": {
+    "subtitle": "mahjong.subtitle.chii",
+    "sounds": [
+      {
+        "name": "mahjong:chii",
+        "stream": true
+      }
+    ]
+  },
+  "pon": {
+    "subtitle": "mahjong.subtitle.pon",
+    "sounds": [
+      {
+        "name": "mahjong:pon",
+        "stream": true
+      }
+    ]
+  },
+  "kan": {
+    "subtitle": "mahjong.subtitle.kan",
+    "sounds": [
+      {
+        "name": "mahjong:kan",
+        "stream": true
+      }
+    ]
+  },
+  "riichi": {
+    "subtitle": "mahjong.subtitle.riichi",
+    "sounds": [
+      {
+        "name": "mahjong:riichi",
+        "stream": true
+      }
+    ]
+  },
+  "ron": {
+    "subtitle": "mahjong.subtitle.ron",
+    "sounds": [
+      {
+        "name": "mahjong:ron",
+        "stream": true
+      }
+    ]
+  },
+  "tsumo": {
+    "subtitle": "mahjong.subtitle.tsumo",
+    "sounds": [
+      {
+        "name": "mahjong:tsumo",
+        "stream": true
+      }
+    ]
+  }
+}

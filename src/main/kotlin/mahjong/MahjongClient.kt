@@ -84,12 +84,12 @@ object MahjongClient : ClientModInitializer {
         }
         ModelPredicateProviderRegistry.register( // Регистрируем провайдеры предикатов для предметов
             ItemRegistry.mahjongTile, // Предмет - плитка маджонга
-            Identifier("code"),
+            Identifier.of("code"),
             modelPredicateProvider
         )
         ModelPredicateProviderRegistry.register(
             ItemRegistry.mahjongScoringStick,
-            Identifier("code"),
+            Identifier.of("code"),
             modelPredicateProvider
         )
 

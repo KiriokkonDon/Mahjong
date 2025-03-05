@@ -32,6 +32,6 @@ class WidgetBotFace(
 
     @Environment(EnvType.CLIENT)
     private fun getBotHeadTexture(): Identifier {
-        return Identifier("mahjong", "textures/entity/icon.png")
+        return Identifier.of("mahjong", "textures/entity/icon.png")
     }
 }

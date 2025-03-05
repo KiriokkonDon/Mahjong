@@ -21,7 +21,7 @@ import org.apache.logging.log4j.Logger
 const val MOD_ID = "mahjong"
 val logger: Logger = LogManager.getLogger()
 
-fun id(path: String): Identifier = Identifier(MOD_ID, path)
+fun id(path: String): Identifier = Identifier.of(MOD_ID, path)
 
 object Mahjong : ModInitializer {
 
@@ -31,6 +31,7 @@ object Mahjong : ModInitializer {
         EntityTypeRegistry.register()
         BlockRegistry.register()
         BlockEntityTypeRegistry.register()
+        SoundRegistry.register()
 
 
         // Register entity attributes

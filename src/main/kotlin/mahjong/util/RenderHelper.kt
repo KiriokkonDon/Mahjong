@@ -8,15 +8,13 @@ import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.font.TextRenderer.TextLayerType
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.PlayerSkinDrawer
-import net.minecraft.client.gui.hud.PlayerListHud
 import net.minecraft.client.render.LightmapTextureManager
 import net.minecraft.client.render.OverlayTexture
 import net.minecraft.client.render.VertexConsumerProvider
-import net.minecraft.client.render.entity.LivingEntityRenderer
-import net.minecraft.client.render.entity.PlayerModelPart
+
 import net.minecraft.client.render.item.ItemRenderer
 import net.minecraft.client.render.model.json.ModelTransformationMode
-import net.minecraft.client.texture.ResourceTexture
+
 import net.minecraft.client.texture.TextureManager
 import net.minecraft.client.util.math.MatrixStack
 import net.minecraft.item.ItemStack
@@ -113,34 +111,15 @@ object RenderHelper {
         size: Int,
     ) {
         val client = MinecraftClient.getInstance()
-        val playerEntity = client.world?.getPlayerByUuid(gameProfile.id)
-        val hatVisible = playerEntity != null && playerEntity.isPartVisible(PlayerModelPart.HAT)
-        val upsideDown = playerEntity != null && LivingEntityRenderer.shouldFlipUpsideDown(playerEntity)
+        val upsideDown = false
 
         val skinTextures = client.skinProvider.getSkinTextures(gameProfile)
         val texture = skinTextures.texture
 
-        PlayerSkinDrawer.draw(context, texture, x, y, size, hatVisible, upsideDown)
+        PlayerSkinDrawer.draw(context, texture, x, y, size, true, upsideDown) // Always render hat (set hatVisible to true)
     }
 
 
-    fun renderBotFace(
-        context: DrawContext,
-        gameProfile: GameProfile,
-        x: Int,
-        y: Int,
-        size: Int,
-    ) {
-        val client = MinecraftClient.getInstance()
-        val playerEntity = client.world?.getPlayerByUuid(gameProfile.id)
-        val hatVisible = playerEntity != null && playerEntity.isPartVisible(PlayerModelPart.HAT)
-        val upsideDown = playerEntity != null && LivingEntityRenderer.shouldFlipUpsideDown(playerEntity)
-
-        val skinTextures = client.skinProvider.getSkinTextures(gameProfile)
-        val texture = skinTextures.texture
-
-        PlayerSkinDrawer.draw(context, texture, x, y, size, hatVisible, upsideDown)
-    }
 
     // Отрисовывает лицо бота в 2D интерфейсе
     fun renderBotFace(

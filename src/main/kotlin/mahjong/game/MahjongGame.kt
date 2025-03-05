@@ -21,6 +21,7 @@ import mahjong.entity.BotEntity
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mahjong.game.player.MahjongPlayerBase
+import mahjong.registry.SoundRegistry
 import net.minecraft.entity.Entity
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
@@ -166,11 +167,13 @@ class MahjongGame(
     private fun clearStuffs(clearRiichiSticks: Boolean = true) {
         players.forEach {
             if (clearRiichiSticks) {
-                it.sticks.filter { stick -> stick.scoringStick == ScoringStick.P1000 }
-                    .forEach { stick ->
+                val riichiSticks = it.sticks.filter { stick -> stick.scoringStick == ScoringStick.P1000 }
+                ServerScheduler.scheduleDelayAction {
+                    riichiSticks.forEach { stick ->
                         stick.remove(Entity.RemovalReason.DISCARDED)
                         it.sticks -= stick
                     }
+                }
             }
             it.riichi = false
             it.doubleRiichi = false
@@ -274,30 +277,37 @@ class MahjongGame(
                         var finalRinshanTile: MahjongTileEntity? = null
                         kanLoop@ while ((player.canKakan || player.canAnkan) && !board.isHoutei && board.kanCount < 4) {
                             val tileToAnkanOrKakan = player.askToAnkanOrKakan(rule)
-                            if (tileToAnkanOrKakan != null) { //Если игрок хочет объявить кан
-                                val isAnkan = tileToAnkanOrKakan in player.tilesCanAnkan.toList()
-                                    .toMahjongTileList() //Проверяем, является ли кан закрытым (Анкан)
-                                val tileEntityToAnkanOrKakan =
-                                    player.hands.find { it.mahjongTile == tileToAnkanOrKakan }
+                            logger.info("Player chose tile for Kan: $tileToAnkanOrKakan, canAnkan: ${player.canAnkan}, canKakan: ${player.canKakan}")
+                            if (tileToAnkanOrKakan != null) {
+                                val isAnkan = tileToAnkanOrKakan in player.tilesCanAnkan.toList().toMahjongTileList()
+                                val tileEntityToAnkanOrKakan = player.hands.find { it.mahjongTile == tileToAnkanOrKakan }
                                 if (tileEntityToAnkanOrKakan == null) {
-                                    cancel("Физическая сущность карты, которую нужно было использовать для скрытого конга, исчезла; возможно, стол для маджонга был разрушен.")
-                                    return@launch
-                                }
-                                // Формируем кан и добавляем его в список фууро
-                                if (isAnkan) {
-                                    player.ankan(tileEntityToAnkanOrKakan!!) // Вызываем метод для закрытого кана
-                                } else {
-                                    player.kakan(tileEntityToAnkanOrKakan!!) // Вызываем метод для открытого кана
-                                }
-                                board.kanCount++
-                                // Удаляем плитки из руки игрока
-                                if (isAnkan) {
-                                    player.hands.removeAll { it.mahjongTile == tileToAnkanOrKakan }
-                                } else {
-                                    player.hands.remove(tileEntityToAnkanOrKakan)
+                                    logger.warn("Tile $tileToAnkanOrKakan not found in ${player.displayName}'s hands: ${player.hands.map { it.mahjongTile }}")
+                                    continue@roundLoop // Пропускаем ход, если тайл не в руке
                                 }
 
-                                board.sortFuuro(player = player)
+                                if (isAnkan) {
+                                    player.ankan(tileEntityToAnkanOrKakan)
+                                } else {
+                                    player.kakan(tileEntityToAnkanOrKakan)
+                                }
+
+                                if (isAnkan) player.ankan(tileEntityToAnkanOrKakan) {
+                                    it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.kan)
+                                } else player.kakan(tileEntityToAnkanOrKakan) {
+                                    it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.kan)
+                                }
+
+                                board.kanCount++
+
+                                ServerScheduler.scheduleDelayAction {
+                                    board.sortFuuro(player)
+                                    syncMahjongTable()
+                                }
+
+
+                                //board.sortFuuro(player = player)
+
                                 //Проверяем, могут ли другие игроки объявить рон по плитке, использованной для кана
                                 //Список игроков которые могут украсть кан
                                 val canChankanList =
@@ -420,6 +430,7 @@ class MahjongGame(
                     player.riichi(riichiSengenTile = tileDiscarded, isFirstRound = board.isFirstRound)
                     board.sortDiscardedTilesForDisplay(player = player, openDoorPlayer = openDoorPlayer)
                     board.putRiichiStick(player = player)
+                    player.playSoundAtHandsMiddle(SoundRegistry.riichi)
                     if (players.count { it.riichi || it.doubleRiichi } == 4) { //Если все игроки объявили риичи, объявляем ничью
                         roundExhaustiveDraw = ExhaustiveDraw.SUUCHA_RIICHI
                         break
@@ -449,6 +460,9 @@ class MahjongGame(
                         rule
                     )) {
                         MahjongGameBehavior.PON -> {
+                            canMinKanOrPonPlayer.pon(tileDiscarded, claimTarget, player) {
+                                it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.pon)
+                            }
                             board.sortFuuro(player = canMinKanOrPonPlayer)
                             nextPlayer = canMinKanOrPonPlayer
                             drawTile = false
@@ -456,6 +470,9 @@ class MahjongGame(
                             true
                         }
                         MahjongGameBehavior.MINKAN -> { //Если игрок хочет объявить минкан
+                            canMinKanOrPonPlayer.minkan(tileDiscarded, claimTarget, player) {
+                                it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.kan)
+                            }
 
                             board.sortFuuro(player = canMinKanOrPonPlayer)
                             val rinshanTile = board.drawRinshanTile(player = canMinKanOrPonPlayer)
@@ -529,14 +546,18 @@ class MahjongGame(
                                             tileDiscarded,
                                             ClaimTarget.LEFT,
                                             player
-                                        )
+                                        ){ here ->
+                                            here.playSoundAtHandsMiddle(soundEvent = SoundRegistry.pon)
+                                        }
                                         cannotDiscardTiles += tileDiscarded.mahjongTile
                                     } else { //Если игрок решил обьявить чи
                                         ponOrChiiPlayer.chii(
                                             tileDiscarded,
                                             tilePairToPonOrChii,
                                             player
-                                        )  //Проверяем не блокирует ли чи другие тайлы, которые могут принести больше очков
+                                        ){ here ->
+                                            here.playSoundAtHandsMiddle(soundEvent = SoundRegistry.chii)
+                                        } //Проверяем не блокирует ли чи другие тайлы, которые могут принести больше очков
                                         val tileDiscardedCode = tileDiscarded.mahjong4jTile.code
                                         val tileDiscardedNumber = tileDiscarded.mahjong4jTile.number
                                         val tileCodeList = mutableListOf(
@@ -566,7 +587,9 @@ class MahjongGame(
                                     else -> ClaimTarget.SELF
                                 }
                                 if (ponOrChiiPlayer.askToPon(tileDiscarded, claimTarget)) {
-                                    ponOrChiiPlayer.pon(tileDiscarded, claimTarget, player)
+                                    ponOrChiiPlayer.pon(tileDiscarded, claimTarget, player){ here ->
+                                        here.playSoundAtHandsMiddle(soundEvent = SoundRegistry.pon)
+                                    }
                                     board.sortFuuro(player = ponOrChiiPlayer)
                                     nextPlayer = ponOrChiiPlayer
                                     drawTile = false
@@ -596,6 +619,9 @@ class MahjongGame(
                         ).also { it.sort() }
                         val indexOfTileDiscarded = tileCodeList.indexOf(tileDiscardedCode)
                         canChiiPlayer.chii(tileDiscarded, askToChiiResult, player)
+                        {
+                            it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.chii)
+                        }
                         board.sortFuuro(player = canChiiPlayer)
                         nextPlayer = canChiiPlayer
                         drawTile = false
@@ -646,6 +672,7 @@ class MahjongGame(
                     board.removeHonbaSticks(player = dealer) // Убираем палочки хонба у бывшего дилера
                     round.nextRound() // Переходим к следующему раунду (меняется ветер/номер раунда)
                 }
+                delayOnServer(100)
                 startRound(clearRiichiSticks = clearNextRoundRiichiSticks)
             } else {
                 if (players.none { it.points >= rule.minPointsToWin }) {
@@ -909,7 +936,8 @@ class MahjongGame(
             seat[(targetIndex + it) % 4]
         }
         val atamahanePlayer = seatOrderFromTarget.find { it in this } //Определяем первого игрока, который мог обьявить рон
-        this.forEach {  // Перебираем всех игроков, объявивших рон
+        this.forEach {
+            it.playSoundAtHandsMiddle(soundEvent = SoundRegistry.ron) // Перебираем всех игроков, объявивших рон
             it.openHands()
             val isDealer = it == seatOrderFromDealer[0]
             val isAtamahanePlayer = it == atamahanePlayer
@@ -963,6 +991,7 @@ class MahjongGame(
         isRinshanKaihoh: Boolean = false,
         tile: MahjongTileEntity,
     ) {
+        playSoundAtHandsMiddle(soundEvent = SoundRegistry.tsumo)
         val yakuSettlementList = mutableListOf<YakuSettlement>()
         val scoreList = mutableListOf<ScoreItem>()
         val allRiichiStickQuantity = players.sumOf { it.riichiStickAmount }
@@ -1149,8 +1178,15 @@ class MahjongGame(
             Text.translatable("$MOD_ID.game.dice_points").formatted(Formatting.GOLD) + " §c$totalPoints"
         realPlayers.map { it.entity }.sendTitles(subtitle = pointsSumText)
         this@MahjongGame.dicePoints = totalPoints
+
+        // Отложенное удаление кубиков через ServerScheduler
+        ServerScheduler.scheduleDelayAction {
+            dices.forEach { it.remove(Entity.RemovalReason.DISCARDED) }
+        }
+
         return dices
     }
+
     //Начинает игру. Расставляет игроков по местам, раздает начальные очки, запускает первый раунд
     override fun start(sync: Boolean) {
         status = GameStatus.PLAYING
@@ -1243,7 +1279,7 @@ class MahjongGame(
         realPlayers.forEach { it.gameOver() }
         botPlayers.forEach {
             it.entity.isInvisible = true
-            it.entity.teleport(tableCenterPos.x, tableCenterPos.y, tableCenterPos.z)
+            it.entity.teleport(tableCenterPos.x, tableCenterPos.y, tableCenterPos.z, false)
         }
         if (sync) syncMahjongTable()
     }

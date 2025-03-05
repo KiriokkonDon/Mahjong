@@ -20,7 +20,7 @@ class BotEntityRenderer(
 
     override fun getTexture(entity: BotEntity): Identifier {
         val botTextureName = "mahjong_bot_${entity.botType}.png"
-        return Identifier("mahjong", "textures/entity/$botTextureName")
+        return Identifier.of("mahjong", "textures/entity/$botTextureName")
     }
 
     override fun hasLabel(entity: BotEntity): Boolean {

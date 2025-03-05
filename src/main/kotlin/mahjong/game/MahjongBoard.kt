@@ -123,10 +123,10 @@ class MahjongBoard(
         discards.clear()
         wall.clear()
         deadWall.clear()
-        // Иногда очистка вызывается одновременно из нескольких мест (например, при разрушении блока игры и при остановке сервера).
-        // Это может привести к ошибке, если один вызов allTiles.clear() начнет выполняться, а другой в это время будет проходить по списку allTiles.
-        // Чтобы избежать этого, создаем копию списка allTiles перед итерацией.
-        allTiles.toList().forEach { if (!it.isRemoved) it.remove(Entity.RemovalReason.DISCARDED) }
+        val tilesToRemove = allTiles.toList()
+        ServerScheduler.scheduleDelayAction {
+            tilesToRemove.forEach { if (!it.isRemoved) it.remove(Entity.RemovalReason.DISCARDED) }
+        }
         allTiles.clear()
     }
 

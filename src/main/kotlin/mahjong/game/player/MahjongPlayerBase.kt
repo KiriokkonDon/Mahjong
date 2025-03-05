@@ -139,35 +139,42 @@ abstract class MahjongPlayerBase : GamePlayer {
 
 
     fun ankan(mjTileEntity: MahjongTileEntity, onAnkan: (MahjongPlayerBase) -> Unit = {}) {
+        val tilesForAnkan = tilesForAnkan(mjTileEntity)
+        if (tilesForAnkan.size != 4) {
+            logger.warn("Not enough tiles for Ankan: ${tilesForAnkan.size}, expected 4, tile: ${mjTileEntity.mahjongTile}")
+            return
+        }
         onAnkan.invoke(this)
         val kantsu = Kantsu(false, mjTileEntity.mahjong4jTile)
-        val tilesForAnkan = tilesForAnkan(mjTileEntity).onEach { it.inGameTilePosition = TilePosition.OTHER }
+        tilesForAnkan.forEach { it.inGameTilePosition = TilePosition.OTHER }
         val fuuro = Fuuro(
             mentsu = kantsu,
             tileMjEntities = tilesForAnkan,
             claimTarget = ClaimTarget.SELF,
             claimTile = mjTileEntity
         )
-        hands -= tilesForAnkan.toSet()
-        discardedTilesForDisplay -= mjTileEntity
+        hands.removeAll(tilesForAnkan) // Удаляем явно все 4 тайла
         fuuroList += fuuro
     }
 
     fun kakan(mjTileEntity: MahjongTileEntity, onKakan: (MahjongPlayerBase) -> Unit = {}) {
+        val minKotsu = fuuroList.find { it.mentsu is Kotsu && mjTileEntity.mahjongTile in it.tileMjEntities.toMahjongTileList() }
+        if (minKotsu == null) {
+            logger.warn("No Pon found for Kakan with tile: ${mjTileEntity.mahjongTile}")
+            return
+        }
         onKakan.invoke(this)
-        val minKotsu =
-            fuuroList.find { mjTileEntity.mahjongTile in it.tileMjEntities.toMahjongTileList() && it.mentsu is Kotsu }
-        fuuroList -= minKotsu!!
+        fuuroList -= minKotsu
         val kakantsu = Kakantsu(mjTileEntity.mahjong4jTile)
-        val tiles = minKotsu!!.tileMjEntities.toMutableList().also { it += mjTileEntity }
+        val tiles = minKotsu.tileMjEntities.toMutableList().also { it += mjTileEntity }
+        tiles.forEach { it.inGameTilePosition = TilePosition.OTHER }
         val fuuro = Fuuro(
             mentsu = kakantsu,
             tileMjEntities = tiles,
             claimTarget = minKotsu.claimTarget,
             claimTile = minKotsu.claimTile
         )
-        hands -= mjTileEntity
-        mjTileEntity.inGameTilePosition = TilePosition.OTHER
+        hands.remove(mjTileEntity) // Удаляем только один тайл
         fuuroList += fuuro
     }
 
@@ -804,26 +811,52 @@ abstract class MahjongPlayerBase : GamePlayer {
     }
 
 
-    private fun playSoundAtHandsMiddle(
+    fun playSoundAtHandsMiddle(
         soundEvent: SoundEvent,
         category: SoundCategory = SoundCategory.VOICE,
         volume: Float = 1f,
-        pitch: Float = 1f,
+        pitch: Float = 1f
     ) {
-        if (hands.size > 0) {
-            val handsMiddleIndex = hands.size / 2
-            hands[handsMiddleIndex].let {
-                it.world.playSound(
+        when (this) {
+            is MahjongPlayer -> {
+                // Для реального игрока: проигрываем звук в центре руки
+                if (hands.isNotEmpty()) {
+                    val handsMiddleIndex = hands.size / 2
+                    val middleTile = hands[handsMiddleIndex]
+                    middleTile.world.playSound(
+                        null, // Отсутствие конкретного игрока-слушателя
+                        middleTile.x,
+                        middleTile.y,
+                        middleTile.z,
+                        soundEvent,
+                        category,
+                        volume,
+                        pitch
+                    )
+                } else {
+                    // Если рук нет, используем позицию игрока
+                    entity.world.playSound(
+                        null,
+                        entity.blockPos,
+                        soundEvent,
+                        category,
+                        volume,
+                        pitch
+                    )
+                }
+            }
+            is MahjongBot -> {
+                // Для бота: проигрываем звук в его позиции
+                entity.world.playSound(
                     null,
-                    it.x,
-                    it.y,
-                    it.z,
+                    entity.blockPos,
                     soundEvent,
-                    category,
+                    category, // Используем переданную категорию
                     volume,
                     pitch
                 )
             }
         }
     }
+
 }
